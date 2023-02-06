@@ -8,34 +8,44 @@ token = os.getenv("VULTR_TOKEN")
 
 
 def dcs_server_stop():
+    
     headers = {"Authorization": "Bearer "+ token}
     r = requests.get("https://api.vultr.com/v2/instances", headers=headers)
     reply = r.json()
     print(str(reply) + "\n\n------------------\n\n")
     for instances in reply['instances']:
-        if instances['hostname'] == "dcs-server":
+        print("this ran")
+        print(instances['label'])
+        if instances['label'] == "dcs-server":
+            print("this ran 2")
             instance_id = instances['id']
+            print("this ran 3")
+            print(instance_id + "\n\n------------------\n\n" + instances['hostname'])
+            print("this ran 4")
             snapshot_body = {"description": "dcs-server", "instance_id": instance_id}
             snapshot_post = requests.post('https://api.vultr.com/v2/snapshots', headers=headers, json=snapshot_body)
             print(snapshot_post.text)
-            while True:
-                snapshot_status = requests.get("https://api.vultr.com/v2/snapshots", headers=headers)
-                snapshot_reply = snapshot_status.json()
-                if snapshot_reply['snapshots'][-1]['status'] == "complete":
-                    print("complete")
-                    break
+            time.sleep(10)  
+    snapshot_api_status = True
+    while snapshot_api_status == True:
+        snapshot_status = requests.get("https://api.vultr.com/v2/instances", headers=headers)
+        snapshot_reply = snapshot_status.json()
+        for instances in snapshot_reply['instances']:
+            if instances['label'] == "dcs-server":
+                instance_id = instances['id']
+                if instances['server_status'] == "ok":
+                    print("active")
+                    snapshot_api_status = False
+                    
                 else:
-                    print("not complete")
+                    print("not active")
                     time.sleep(1)
-
-            
-            print(instance_id)
-            shutdown_body = {"instance_id": instance_id}
-            shutdown = requests.delete("https://api.vultr.com/v2/instances/"+instance_id, headers=headers)
-            print(shutdown.text)
-            return "Server is shutting down! :slight_frown: You can start the server by using \n ```!dcs start```"
-        else:
-            continue
+        
+    print(instance_id)
+    shutdown = requests.delete("https://api.vultr.com/v2/instances/"+instance_id, headers=headers)
+    print(shutdown.text)
+    return "Server is shutting down! :slight_frown: You can start the server by using \n ```!dcs start```"
+    
 
 def dcs_server_status():
 
@@ -72,7 +82,7 @@ def dcs_server_start():
     block_reply = block_get.json()
     print(block_reply)
     dcs_block = ""
-    for block in reply['blocks']:
+    for block in block_reply['blocks']:
         if block['label'] == "dcs-storage":
             dcs_block = block['id']
             print(dcs_block)
@@ -94,7 +104,7 @@ def dcs_server_start():
             ipaddr = ip['subnet']
             print(reserved_ip, " ", ipaddr)
 
-    instance_body = {"region": "ewr", "plan": "vc2-4c-8gb", "label": "dcs-server", "snapshot_id": latest_snapshot, "reserved_ipv4": reserved_ip}
+    instance_body = {"region": "ewr", "plan": "vc2-4c-8gb", "label": "dcs-server", "snapshot_id": latest_snapshot, "reserved_ipv4": reserved_ip, "hostname": "dcs-server"}
     snapshot_id = latest_snapshot
     print(snapshot_id)
     restore = requests.post("https://api.vultr.com/v2/instances", headers=headers, json=instance_body)
